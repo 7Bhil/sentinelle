@@ -13,17 +13,21 @@ from ids_engine import IDS_Engine
 from dns_guard import DNS_Guard
 from escalation import EscalationManager
 from counter_attack import CounterAttack
+from database import MirageDB
+from process_monitor import ProcessMonitor
 
 class TrafficMonitor:
     def __init__(self, interface=None):
         self.interface = interface
         self.workspace_root = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
         self.state = MirageState(self.workspace_root)
+        self.db = MirageDB(self.workspace_root)
         self.baseline = self._load_baseline()
         self.ids = IDS_Engine(self.state)
         self.dns_guard = DNS_Guard()
         self.escalation = EscalationManager(self.state)
         self.counter = CounterAttack()
+        self.proc_monitor = ProcessMonitor(self.db)
         self.running = False
 
     def _load_baseline(self):
@@ -53,6 +57,7 @@ class TrafficMonitor:
             # 2. Port Scan Detection
             if TCP in pkt:
                 if self.ids.check_port_scan(src_ip, pkt[TCP].dport):
+                    self.db.log_event("sentinelle", "port_scan", "high", src_ip, "Tentative de scan de ports détectée.")
                     self.escalation.handle_threat(src_ip, "high")
                     self.counter.flood_fake_responses(src_ip)
                     self.counter.corrupt_scan_data(src_ip)
@@ -63,6 +68,7 @@ class TrafficMonitor:
                     domain = pkt[DNSQR].qname.decode()
                     is_mal, msg = self.dns_guard.check_query(domain)
                     if is_mal:
+                        self.db.log_event("sentinelle", "dns_threat", "medium", src_ip, msg)
                         self.ids._trigger_alert(src_ip, "dns_threat", msg)
                         self.escalation.handle_threat(src_ip, "medium")
                         self.counter.send_fake_dns_reply(src_ip, domain)
@@ -71,11 +77,13 @@ class TrafficMonitor:
 
             # 4. Lateral Movement Detection
             if self.ids.check_lateral_movement(src_ip, dst_ip):
+                self.db.log_event("sentinelle", "lateral_movement", "critical", src_ip, f"Mouvement latéral vers {dst_ip}")
                 self.escalation.handle_threat(src_ip, "critical")
                 self.counter.fake_network_topology(src_ip)
 
             # 5. Data Exfiltration Detection
             if self.ids.check_exfiltration(src_ip, pkt_size):
+                self.db.log_event("sentinelle", "data_exfiltration", "critical", src_ip, "Exfiltration de données détectée")
                 self.escalation.handle_threat(src_ip, "critical")
 
     def _update_stats(self, ip, pkt):
@@ -98,6 +106,11 @@ class TrafficMonitor:
 
     def start(self):
         print(f"[*] 🛡️ MIRAGE SENTINELLE : Surveillance lancée sur {self.interface if self.interface else 'toutes les interfaces'}")
+        
+        # Lancer le monitor de processus dans un thread séparé
+        proc_thread = threading.Thread(target=self.proc_monitor.run_daemon, args=(30,), daemon=True)
+        proc_thread.start()
+        
         self.running = True
         sniff(iface=self.interface, prn=self.packet_callback, store=0)
 
