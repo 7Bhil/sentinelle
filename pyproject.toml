@@ -1,0 +1,16 @@
+[tool.poetry]
+name = "mirage-sentinelle"
+version = "1.0.0"
+description = "Mirage Sentinelle Engine: Active Network IDS/IPS"
+authors = ["7Bhil <contact@7bhil.com>"]
+readme = "README.md"
+packages = [{include = "sentinelle"}]
+
+[tool.poetry.dependencies]
+python = "^3.10"
+scapy = "^2.5.0"
+requests = "^2.31.0"
+
+[build-system]
+requires = ["poetry-core"]
+build-backend = "poetry.core.masonry.api"
