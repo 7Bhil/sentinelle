@@ -1,6 +1,6 @@
 import sys
 import os
-from scapy.all import sniff, IP, TCP, UDP, DNS, DNSQR
+from scapy.all import sniff, IP, TCP, UDP, DNS, DNSQR, Raw
 from datetime import datetime
 import json
 import threading
@@ -15,6 +15,8 @@ from escalation import EscalationManager
 from counter_attack import CounterAttack
 from database import MirageDB
 from process_monitor import ProcessMonitor
+from signature_engine import SignatureEngine
+from metadata_engine import MetadataEngine
 
 class TrafficMonitor:
     def __init__(self, interface=None):
@@ -23,6 +25,11 @@ class TrafficMonitor:
         self.state = MirageState(self.workspace_root)
         self.db = MirageDB(self.workspace_root)
         self.baseline = self._load_baseline()
+        
+        # Dual Engine Setup (Suricata + Zeek Inspired)
+        self.suricata = SignatureEngine()      # Détection temps réel (Signatures)
+        self.zeek = MetadataEngine(self.db)    # Analyse comportementale (Métadonnées)
+        
         self.ids = IDS_Engine(self.state)
         self.dns_guard = DNS_Guard()
         self.escalation = EscalationManager(self.state)
@@ -51,10 +58,21 @@ class TrafficMonitor:
             dst_ip = pkt[IP].dst
             pkt_size = len(pkt)
             
-            # 1. Update baseline stats
+            # --- ZEEK LAYER : Extraction de métadonnées & Baseline ---
+            meta = self.zeek.extract_metadata(pkt)
+            self.zeek.log_metadata(src_ip, dst_ip, meta)
             self._update_stats(src_ip, pkt)
             
-            # 2. Port Scan Detection
+            # --- SURICATA LAYER : Détection de signatures d'attaques ---
+            if pkt.haslayer(Raw):
+                match = self.suricata.inspect_payload(pkt[Raw].load)
+                if match:
+                    msg = f"ALERTE SIGNATURE : {match['name']} détecté !"
+                    self.db.log_event("sentinelle_suricata", "attack_signature", "critical", src_ip, msg)
+                    self.escalation.handle_threat(src_ip, "critical")
+
+            # --- IDS LAYER : Analyse comportementale brute ---
+            # 1. Port Scan Detection
             if TCP in pkt:
                 if self.ids.check_port_scan(src_ip, pkt[TCP].dport):
                     self.db.log_event("sentinelle", "port_scan", "high", src_ip, "Tentative de scan de ports détectée.")
@@ -62,7 +80,7 @@ class TrafficMonitor:
                     self.counter.flood_fake_responses(src_ip)
                     self.counter.corrupt_scan_data(src_ip)
 
-            # 3. DNS Guard & Counter-DNS
+            # 2. DNS Guard & Counter-DNS
             if DNS in pkt and pkt[DNS].qr == 0:
                 try:
                     domain = pkt[DNSQR].qname.decode()
@@ -75,13 +93,13 @@ class TrafficMonitor:
                 except:
                     pass
 
-            # 4. Lateral Movement Detection
+            # 3. Lateral Movement Detection
             if self.ids.check_lateral_movement(src_ip, dst_ip):
                 self.db.log_event("sentinelle", "lateral_movement", "critical", src_ip, f"Mouvement latéral vers {dst_ip}")
                 self.escalation.handle_threat(src_ip, "critical")
                 self.counter.fake_network_topology(src_ip)
 
-            # 5. Data Exfiltration Detection
+            # 4. Data Exfiltration Detection
             if self.ids.check_exfiltration(src_ip, pkt_size):
                 self.db.log_event("sentinelle", "data_exfiltration", "critical", src_ip, "Exfiltration de données détectée")
                 self.escalation.handle_threat(src_ip, "critical")
@@ -94,9 +112,7 @@ class TrafficMonitor:
                 "common_dst_ports": {},
                 "dns_queries": []
             }
-        
         self.baseline[ip]["packet_count"] += 1
-        
         if TCP in pkt:
             port = pkt[TCP].dport
             self.baseline[ip]["common_dst_ports"][str(port)] = self.baseline[ip]["common_dst_ports"].get(str(port), 0) + 1
@@ -105,30 +121,24 @@ class TrafficMonitor:
             self.baseline[ip]["common_dst_ports"][str(port)] = self.baseline[ip]["common_dst_ports"].get(str(port), 0) + 1
 
     def start(self):
-        print(f"[*] 🛡️ MIRAGE SENTINELLE : Surveillance lancée sur {self.interface if self.interface else 'toutes les interfaces'}")
-        
-        # Lancer le monitor de processus dans un thread séparé
+        print(f"[*] 🛡️ MIRAGE SENTINELLE (Engine: Dual Suricata/Zeek) : Surveillance lancée sur {self.interface if self.interface else 'toutes les interfaces'}")
         proc_thread = threading.Thread(target=self.proc_monitor.run_daemon, args=(30,), daemon=True)
         proc_thread.start()
-        
         self.running = True
         sniff(iface=self.interface, prn=self.packet_callback, store=0)
 
     def stop(self):
         self.running = False
         self._save_baseline()
-        print("\n[*] Sentinelle : Capture arrêtée et baseline sauvegardée.")
+        print("\n[*] Sentinelle : Capture arrêtée.")
 
 def main():
     parser = argparse.ArgumentParser(description="Mirage Sentinelle - Real-time Network Guardian")
-    parser.add_argument("--interface", help="Network interface to monitor (e.g. eth0, wlan0)")
+    parser.add_argument("--interface", help="Network interface to monitor")
     parser.add_argument("--threshold", type=int, default=20, help="Port scan sensitivity threshold")
-    
     args = parser.parse_args()
-    
     monitor = TrafficMonitor(interface=args.interface)
     monitor.ids.port_scan_threshold = args.threshold
-    
     try:
         monitor.start()
     except KeyboardInterrupt:
