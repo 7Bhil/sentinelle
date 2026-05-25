@@ -1,0 +1,25 @@
+rules:
+  - id: 1001
+    name: "SQL Injection attempt"
+    pattern: "UNION\\s+SELECT|OR\\s+1=1"
+    proto: "TCP"
+  - id: 1002
+    name: "Cross-Site Scripting (XSS)"
+    pattern: "<script>|alert\\("
+    proto: "TCP"
+  - id: 1003
+    name: "Path Traversal"
+    pattern: "\\.\\./\\.\\./"
+    proto: "TCP"
+  - id: 1004
+    name: "Log4Shell Attempt"
+    pattern: "\\$\\{jndi:ldap"
+    proto: "TCP"
+  - id: 1005
+    name: "Shellshock Vulnerability"
+    pattern: "\\(\\)\\s*\\{.*\\}\\s*;"
+    proto: "TCP"
+  - id: 1006
+    name: "EternalBlue SMB Signature"
+    pattern: "\\x00\\x00\\x00\\x85\\xff\\x53\\x4d\\x42"
+    proto: "TCP"
