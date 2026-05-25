@@ -163,15 +163,23 @@ class TrafficMonitor:
         threading.Thread(target=self.proc_monitor.run_daemon, args=(30,), daemon=True).start()
         threading.Thread(target=self._auto_save_loop, daemon=True).start()
         
-        # --- COMMAND POLLING ---
+        # --- COMMAND POLLING & HEARTBEAT ---
         if self.cloud_db:
             threading.Thread(target=self._command_listener, daemon=True).start()
+            threading.Thread(target=self._heartbeat_loop, daemon=True).start()
             
         sniff(iface=self.interface, prn=self.packet_callback, store=0)
+
+    def _heartbeat_loop(self):
+        """Envoie un battement de coeur au Cloud pour signaler que le Gardien est en ligne"""
+        while self.running:
+            self.cloud_db.send_heartbeat("sentinelle")
+            time.sleep(60)
 
     def _command_listener(self):
         """Boucle qui vérifie si Oracle a envoyé des commandes dans MongoDB"""
         print("[*] Listener de commandes Cloud activé.")
+        import re
         while self.running:
             try:
                 commands = self.cloud_db.get_pending_commands("sentinelle")
@@ -180,20 +188,23 @@ class TrafficMonitor:
                     target = cmd.get("target_ip")
                     cmd_id = cmd.get("_id")
                     
-                    print(f"[!] Commande reçue d'Oracle : {action} sur {target}")
+                    print(f"[!] Commande reçue : {action} sur {target}")
                     
-                    # Logique de blocage
                     if action == "isolate_ip" and target:
-                        # Exemple de blocage via iptables (nécessite sudo)
-                        os.system(f"sudo iptables -A INPUT -s {target} -j DROP")
-                        self.cloud_db.update_command_status(cmd_id, "executed", result=f"IP {target} isolée via iptables")
-                        self.log_alert("remediation", "high", target, f"Isolation automatique de l'IP {target} effectuée.")
+                        # Validation IP pour sécurité
+                        if re.match(r"^(\d{1,3}\.){3}\d{1,3}$", target):
+                            import subprocess
+                            try:
+                                subprocess.run(["sudo", "iptables", "-A", "INPUT", "-s", target, "-j", "DROP"], check=True)
+                                self.cloud_db.update_command_status(cmd_id, "executed", result=f"IP {target} isolée")
+                                self.log_alert("remediation", "high", target, f"Isolation automatique de l'IP {target} effectuée.")
+                            except Exception as e:
+                                self.cloud_db.update_command_status(cmd_id, "failed", result=str(e))
+                        else:
+                            self.cloud_db.update_command_status(cmd_id, "failed", result="IP invalide")
                     
-                    # Autres actions possibles...
-                    
-                time.sleep(5) # Vérifier toutes les 5 secondes
+                time.sleep(5)
             except Exception as e:
-                print(f"[!] Erreur Command Listener : {e}")
                 time.sleep(10)
 
 def main():
