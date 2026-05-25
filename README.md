@@ -24,7 +24,7 @@ chmod +x install.sh
 
 ```bash
 # Lancer la surveillance globale
-sudo venv/bin/python3 traffic_monitor.py
+sudo venv/bin/python3 sentinelle.py
 ```
 
 ---
