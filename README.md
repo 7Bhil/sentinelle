@@ -1,9 +1,9 @@
-# 🛡️ Mirage Sentinelle Engine
+#  Mirage Sentinelle Engine
 
 > **Le Gardien du Réseau.**  
 > Deuxième pilier de l'écosystème **MIRAGE**, ce module est un IDS/IPS actif capable de surveiller, détecter et contre-attaquer en temps réel.
 
-## ✨ Fonctionnalités clés
+##  Fonctionnalités clés
 
 - **Monitoring Temps Réel** : Analyse de flux réseau via Scapy.
 - **Détection d'Anomalies** : Identifie les scans de ports et les comportements suspects.
@@ -11,7 +11,7 @@
 - **Escalade Progressive** : Réponse automatique graduée (Alerte -> Throttling -> Isolation).
 - **Contre-Attaque Défensive** : Inonde l'attaquant de fausses réponses pour le ralentir.
 
-## 🚀 Installation Rapide
+##  Installation Rapide
 
 ```bash
 git clone https://github.com/7Bhil/sentinelle.git
@@ -20,7 +20,7 @@ chmod +x install.sh
 ./install.sh
 ```
 
-## 🛠️ Utilisation
+##  Utilisation
 
 ```bash
 # Lancer la surveillance globale

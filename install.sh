@@ -3,7 +3,7 @@
 
 # Vérification ROOT
 if [ "$EUID" -ne 0 ]; then
-  echo "❌ Erreur : Veuillez lancer l'installation avec sudo."
+  echo " Erreur : Veuillez lancer l'installation avec sudo."
   exit 1
 fi
 

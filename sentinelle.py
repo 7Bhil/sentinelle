@@ -158,7 +158,7 @@ class TrafficMonitor:
         self.baseline[ip]["packet_count"] += 1
 
     def start(self):
-        print(f"[*] 🛡️ MIRAGE SENTINELLE : Surveillance lancée sur {self.interface if self.interface else 'toutes les interfaces'}")
+        print(f"[*]  MIRAGE SENTINELLE : Surveillance lancée sur {self.interface if self.interface else 'toutes les interfaces'}")
         self.running = True
         threading.Thread(target=self.proc_monitor.run_daemon, args=(30,), daemon=True).start()
         threading.Thread(target=self._auto_save_loop, daemon=True).start()

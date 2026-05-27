@@ -14,7 +14,7 @@ def download_emerging_threats():
             
             # Compter les règles pour l'effet "Wow"
             count = len([l for l in response.text.splitlines() if l.startswith("alert")])
-            print(f"[✅] {count} règles professionnelles chargées avec succès.")
+            print(f"[] {count} règles professionnelles chargées avec succès.")
             return True
     except Exception as e:
         print(f"[!] Erreur téléchargement règles : {e}")

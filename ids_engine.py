@@ -53,4 +53,4 @@ class IDS_Engine:
             }
         }
         self.state.add_event(alert)
-        print(f"[⚠️ ALERT] {ip} : {message}")
+        print(f"[ ALERT] {ip} : {message}")

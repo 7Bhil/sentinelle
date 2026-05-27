@@ -25,7 +25,7 @@ class MirageCommunicator:
 
     def activate_ghost(self, attacker_ip, target_ip):
         """Déclencher la création d'un clone Ghost pour piéger l'attaquant"""
-        print(f"[👻 GHOST] Signal envoyé pour piéger {attacker_ip}...")
+        print(f"[ GHOST] Signal envoyé pour piéger {attacker_ip}...")
         trigger_data = {
             "timestamp": datetime.now().isoformat(),
             "attacker_ip": attacker_ip,

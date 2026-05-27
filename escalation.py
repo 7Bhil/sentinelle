@@ -16,7 +16,7 @@ class EscalationManager:
             self.level_3(ip)
 
     def level_1(self, ip):
-        print(f"[🛡️ LEVEL 1] Alerte Admin envoyée pour {ip}. En attente de 30s...")
+        print(f"[ LEVEL 1] Alerte Admin envoyée pour {ip}. En attente de 30s...")
         if ip not in self.active_timers:
             # Démarrer un timer : si pas d'action après 30s, passer au Niveau 2
             t = threading.Timer(30.0, self.level_2, args=[ip])
@@ -29,7 +29,7 @@ class EscalationManager:
             self.active_timers[ip].cancel()
             del self.active_timers[ip]
             
-        print(f"[🛡️ LEVEL 2] Escalade : Mesures défensives automatiques (Throttling) pour {ip}.")
+        print(f"[ LEVEL 2] Escalade : Mesures défensives automatiques (Throttling) pour {ip}.")
         subprocess.run(f"sudo iptables -A INPUT -s {ip} -m limit --limit 1/s -j ACCEPT", shell=True)
         subprocess.run(f"sudo iptables -A INPUT -s {ip} -j DROP", shell=True)
 
@@ -38,6 +38,6 @@ class EscalationManager:
             self.active_timers[ip].cancel()
             del self.active_timers[ip]
             
-        print(f"[🛡️ LEVEL 3] Décision immédiate : Blocage total de {ip}.")
+        print(f"[ LEVEL 3] Décision immédiate : Blocage total de {ip}.")
         subprocess.run(f"sudo iptables -I INPUT -s {ip} -j DROP", shell=True)
         subprocess.run(f"sudo iptables -I OUTPUT -d {ip} -j DROP", shell=True)
